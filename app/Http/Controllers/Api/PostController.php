@@ -10,13 +10,13 @@ class PostController extends Controller
 {
     public function index()
     {
-        $posts = Post::all();
+        $posts = Post::with('user')->latest()->get();
         return response()->json($posts);
     }
 
     public function show($id)
     {
-        $post = Post::find($id);
+        $post = Post::with('user')->find($id);
         if (!$post) {
             return response()->json(['message' => 'Post not found'], 404);
         }
@@ -30,9 +30,11 @@ class PostController extends Controller
             'body' => 'required|string',
         ]);
 
-        $post = Post::create($request->only(['title', 'body']));
+        $post = $request->user()->posts()->create($request->only(['title', 'body']));
+        // $post = Post::create($request->only(['title', 'body']));
 
-        return response()->json($post, 201);
+
+        return response()->json($post->load('user'), 201);
     }
 
     public function update(Request $request, $id)
@@ -43,6 +45,10 @@ class PostController extends Controller
             return response()->json(['message' => 'Post not found'], 404);
         }
 
+        if ($post->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
         $request->validate([
             'title' => 'sometimes|string|max:255',
             'body' => 'sometimes|string',
@@ -50,14 +56,18 @@ class PostController extends Controller
 
         $post->update($request->only(['title', 'body']));
 
-        return response()->json($post);
+        return response()->json($post->load('user'));
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
         $post = Post::find($id);
         if (!$post) {
             return response()->json(['message' => 'Post not found'], 404);
+        }
+
+        if ($post->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Forbidden'], 403);
         }
 
         $post->delete();
