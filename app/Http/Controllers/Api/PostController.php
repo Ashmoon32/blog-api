@@ -3,15 +3,19 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\PostResource;
+use App\Http\Resources\PostCollection;
 use App\Models\Post;
+use App\Http\Requests\StorePostRequest;
+use App\Http\Requests\UpdatePostRequest;
 use Illuminate\Http\Request;
 
 class PostController extends Controller
 {
     public function index()
     {
-        $posts = Post::with('user')->latest()->get();
-        return response()->json($posts);
+        $posts = Post::with('user')->latest()->paginate(10);
+        return new PostCollection($posts);
     }
 
     public function show($id)
@@ -20,24 +24,24 @@ class PostController extends Controller
         if (!$post) {
             return response()->json(['message' => 'Post not found'], 404);
         }
-        return response()->json($post);
+        return new PostResource($post);
     }
 
-    public function store(Request $request)
+    public function store(StorePostRequest $request)
     {
-        $request->validate([
-            'title' => 'required|string|max:255',
-            'body' => 'required|string',
-        ]);
+        // $request->validate([
+        //     'title' => 'required|string|max:255',
+        //     'body' => 'required|string',
+        // ]);
 
-        $post = $request->user()->posts()->create($request->only(['title', 'body']));
+        $post = $request->user()->posts()->create($request->validated());
         // $post = Post::create($request->only(['title', 'body']));
 
 
-        return response()->json($post->load('user'), 201);
+        return (new PostResource($post->load('user')))->response()->setStatusCode(201);
     }
 
-    public function update(Request $request, $id)
+    public function update(UpdatePostRequest $request, $id)
     {
         $post = Post::find($id);
 
@@ -49,14 +53,14 @@ class PostController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        $request->validate([
-            'title' => 'sometimes|string|max:255',
-            'body' => 'sometimes|string',
-        ]);
+        // $request->validate([
+        //     'title' => 'sometimes|string|max:255',
+        //     'body' => 'sometimes|string',
+        // ]);
 
-        $post->update($request->only(['title', 'body']));
+        $post->update($request->validated());
 
-        return response()->json($post->load('user'));
+        return new PostResource($post->load('user'));
     }
 
     public function destroy(Request $request, $id)
